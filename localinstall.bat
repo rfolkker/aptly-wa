@@ -1,1 +1,1 @@
-cp -r ./aptly_wa %1\.venv\lib\python3.10\site-packages
+powershell copy-item .\aptly_wa C:\Users\rfolk\source\aptly-ws\.venv\lib\site-packages -Recurse -Force
