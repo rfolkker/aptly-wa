@@ -132,8 +132,8 @@ class Repo(API):
 
     def publish(self, data):
         repo_name = data.get("repo_name", "")
-        distribution = data.get("distribution":"")
-        component = data.get("component":"")
+        distribution = data.get("distribution","")
+        component = data.get("component","")
 
         if repo_name == "":
             return {}
