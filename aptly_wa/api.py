@@ -9,7 +9,7 @@ class API:
     base_url = ""
     api_token = False
     headers = {"Content-Type": "application/json"}
-
+    actions = {}
     def __init__(self, base_url, api_token=None):
         self.base_url = base_url
         self.api_token = api_token
@@ -46,6 +46,11 @@ class API:
         response = requests.put(endpoint, json=data, headers=self.headers)
         response.raise_for_status()
         return response.json()
+    def run(self, function_name, function_data):
+        if function_name in self.actions.keys():
+            return self.actions[function_name](function_data)
+        # Default return
+        return {}
     
 class DB(API):
     def __init__(self, base_url, api_token=None):
@@ -58,6 +63,11 @@ class Config(API):
 class Misc(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
+        self.actions = {
+            "graph":self.graph,
+            "version":self.version,
+            "healthy":self.healthy, 
+            "ready":self.ready}
     def graph(self):
         endpoint = f"{self.base_url}/graph.png"
         response = self._get_file(endpoint,"graph.png")
@@ -85,24 +95,53 @@ class Publish(API):
 class Repo(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
+        self.actions = {
+            "create":self.create,
+            "list":self.list,
+            "assign_file":self.assign_file, 
+            "publish":self.publish}
 
-    def create(self, repo_name, comment=None):
+    def create(self, data):
+        repo_name = data.get("repo_name", "")
+        comment = data.get("comment",None)
+
         endpoint = f"{self.base_url}/repos"
         data = {"Name": repo_name, "Comment": comment}
         response = self._post(endpoint, data)
         return response
 
-    def list(self):
+    def list(self, data=None):
+        # data is unused
         endpoint = f"{self.base_url}/repos"
         response = self._get(endpoint)
         return response
     # This should be added to the file package
-    def assign_file(self, repo_name, file_path, file_data):
+    def assign_file(self, data):
+        repo_name = data.get("repo_name", "")
+        file_path = data.get("file_path", "")
+        file_data = data.get("file_data", None)
+        if repo_name == "":
+            return {}
+        if file_path == "":
+            return {}
+        if file_data == None:
+            return {}
         endpoint = f"{self.base_url}/repos/{repo_name}/files/{file_path}"
         response = self._post(endpoint, file_data)
         return response
 
-    def publish(self, repo_name, distribution, component):
+    def publish(self, data):
+        repo_name = data.get("repo_name", "")
+        distribution = data.get("distribution":"")
+        component = data.get("component":"")
+
+        if repo_name == "":
+            return {}
+        if distribution == "":
+            return {}
+        if component == "":
+            return {}
+        
         endpoint = f"{self.base_url}/repos/{repo_name}/publish/{distribution}"
         data = {"Sources": [{"Component": component}]}
         response = self._post(endpoint, data)
@@ -111,12 +150,23 @@ class Repo(API):
 class Package(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
-    def list(self, repo_name):
+    def list(self, data):
+        repo_name = data.get("repo_name", "")
+        if repo_name == "":
+            return {}
+        
         endpoint = f"{self.base_url}/repos/{repo_name}/packages"
         response = self._get(endpoint )
         return response
 
-    def get(self, repo_name, package_name):
+    def get(self, data):
+        repo_name = data.get("repo_name", "")
+        package_name = data.get("package_name", "")
+        if repo_name == "":
+            return {}
+        if package_name == "":
+            return {}
+        
         endpoint = f"{self.base_url}/repos/{repo_name}/packages?q={package_name}&format=details"
         response = self._get(endpoint )
         return response
