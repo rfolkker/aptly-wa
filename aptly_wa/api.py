@@ -1,6 +1,9 @@
 #!/usr/bin/python3
 import requests
+import shutil
 from pprint import pprint
+from matplotlib import pyplot as plt
+from matplotlib import image as mpimg
 
 class API:
     base_url = ""
@@ -25,6 +28,20 @@ class API:
         response.raise_for_status()
         return response.json()
     
+    def _get_file(self, endpoint, filename):
+        # TODO: Add step to convert data to parameters added to endpoint
+        response = None
+        return_value = filename
+        try:
+            response = requests.get(endpoint, headers=self.headers, stream=True)
+            with open(filename, 'wb') as out_file:
+                shutil.copyfileobj(response.raw, out_file)
+        except:
+            del response
+            return_value = "" # Empty if we fail to save
+
+        return return_value # Not session safe
+
     def _put(self, endpoint, data=None):
         response = requests.put(endpoint, json=data, headers=self.headers)
         response.raise_for_status()
@@ -41,6 +58,25 @@ class Config(API):
 class Misc(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
+    def graph(self):
+        endpoint = f"{self.base_url}/graph.png"
+        response = self._get_file(endpoint,"graph.png")
+        return response
+    def version(self):
+        endpoint = f"{self.base_url}/version"
+        response = self._get(endpoint )
+        return response
+    def healthy(self):
+        # currently not enabled on server
+        # endpoint = f"{self.base_url}/healthy"
+        # response = self._get(endpoint )
+        # return response
+        return {"Status":"Feature not enabled"}
+    def ready(self):
+        # endpoint = f"{self.base_url}/ready"
+        # response = self._get(endpoint )
+        # return response
+        return {"Status":"Feature not enabled"}
 
 class Publish(API):
     def __init__(self, base_url, api_token=None):
@@ -60,10 +96,10 @@ class Repo(API):
         endpoint = f"{self.base_url}/repos"
         response = self._get(endpoint)
         return response
-
-    def upload(self, repo_name, file_path):
-        endpoint = f"{self.base_url}/repos/{repo_name}/file/{file_path}"
-        response = self._post(endpoint)
+    # This should be added to the file package
+    def assign_file(self, repo_name, file_path, file_data):
+        endpoint = f"{self.base_url}/repos/{repo_name}/files/{file_path}"
+        response = self._post(endpoint, file_data)
         return response
 
     def publish(self, repo_name, distribution, component):
@@ -72,23 +108,52 @@ class Repo(API):
         response = self._post(endpoint, data)
         return response
 
-class Serve(API):
+class Package(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
+    def list(self, repo_name):
+        endpoint = f"{self.base_url}/repos/{repo_name}/packages"
+        response = self._get(endpoint )
+        return response
+
+    def get(self, repo_name, package_name):
+        endpoint = f"{self.base_url}/repos/{repo_name}/packages?q={package_name}&format=details"
+        response = self._get(endpoint )
+        return response
 
 class Snapshot(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
 
-class Task(API):
-    def __init__(self, base_url, api_token=None):
-        super().__init__(base_url, api_token)
+def test_misc(api_url):
+    misc = Misc(api_url)
+    saved_file = misc.graph()
+    print(f"Graph saved as [{saved_file}]")
+    print("\nVersion")
+    pprint(misc.version())
+    print("\nHealth:")
+    pprint(misc.healthy())
+    print("\nReady:")
+    pprint(misc.ready())
 
-def main():
-    api_url = "APT_URL"
+def test_packages(api_url):
+    package = Package(api_url)
+    print("Getting Packages:")
+    print("Foo Repo:")
+    pprint(package.list("foo"))
+    print("\nWebmin Package")
+    pprint(package.get("foo","webmin"))
+
+def test_repos(api_url):
     repo = Repo(api_url)
     print("Getting Repos:")
     pprint(repo.list())
+
+def main():
+    api_url = "API_URL"
+    test_repos(api_url)
+    test_packages(api_url)
+    test_misc(api_url)
 
 if __name__ == '__main__':
     main()
