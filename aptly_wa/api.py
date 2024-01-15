@@ -13,6 +13,7 @@ class API:
     def __init__(self, base_url, api_token=None):
         self.base_url = base_url
         self.api_token = api_token
+        self.actions = {"default":self._default}
 
         if api_token:
             self.headers["Authorization"] = f"Bearer {api_token}"
@@ -46,11 +47,15 @@ class API:
         response = requests.put(endpoint, json=data, headers=self.headers)
         response.raise_for_status()
         return response.json()
+    
+    def _default(self, function_name, function_data):
+        return {}
+    
     def run(self, function_name, function_data):
         if function_name in self.actions.keys():
             return self.actions[function_name](function_data)
         # Default return
-        return {}
+        return self._default("", None)
     
 class DB(API):
     def __init__(self, base_url, api_token=None):
@@ -64,6 +69,7 @@ class Misc(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
         self.actions = {
+            "default":self._default,
             "graph":self.graph,
             "version":self.version,
             "healthy":self.healthy, 
@@ -96,6 +102,7 @@ class Repo(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
         self.actions = {
+            "default":self._default,
             "create":self.create,
             "list":self.list,
             "assign_file":self.assign_file, 
@@ -150,6 +157,11 @@ class Repo(API):
 class Package(API):
     def __init__(self, base_url, api_token=None):
         super().__init__(base_url, api_token)
+        self.actions = {
+            "default":self._default,
+            "list":self.list,
+            "get":self.get}
+
     def list(self, data):
         repo_name = data.get("repo_name", "")
         if repo_name == "":
@@ -157,17 +169,35 @@ class Package(API):
         
         endpoint = f"{self.base_url}/repos/{repo_name}/packages"
         response = self._get(endpoint )
-        return response
+        result = {}
+        results = []
+        if response is not None:
+            for item in response:
+                parts = item.split(" ")
+                # First part is arch with an added P
+                result["arch"] = parts[0][1:]
+                result['name'] = parts[1]
+                result['version'] = parts[2]
+                result['hash'] = parts[3]
+                results.append(result)
+                result = {}
+        return results
 
     def get(self, data):
-        repo_name = data.get("repo_name", "")
-        package_name = data.get("package_name", "")
-        if repo_name == "":
+        name = data.get("package_name", "")
+        version = data.get("version", "")
+        arch = data.get("arch", "")
+        hash = data.get("hash", "")
+        if name == "":
             return {}
-        if package_name == "":
+        if version == "":
+            return {}
+        if arch == "":
+            return {}
+        if hash == "":
             return {}
         
-        endpoint = f"{self.base_url}/repos/{repo_name}/packages?q={package_name}&format=details"
+        endpoint = f"{self.base_url}/packages/P{arch}%20{name}%20{version}%20{hash}"
         response = self._get(endpoint )
         return response
 
@@ -190,7 +220,7 @@ def test_packages(api_url):
     package = Package(api_url)
     print("Getting Packages:")
     print("Foo Repo:")
-    pprint(package.list("foo"))
+    pprint(package.list({"repo_name":"foo"}))
     print("\nWebmin Package")
     pprint(package.get("foo","webmin"))
 
